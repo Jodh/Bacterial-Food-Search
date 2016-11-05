@@ -1,0 +1,11 @@
+TODO
+1. Initialize Data Structures
+1.1 Terrain
+1.2 Bacteria (agents)
+1.3 Velocity Matrix for agents
+1.4 Helper formulas and functions to be used later
+1.5 Parameters
+
+2. Write update function without communication part
+
+3. Modify update function with global communication
