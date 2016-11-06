@@ -24,7 +24,7 @@ import math
 
 # global parameters
 pi = np.pi
-food = np.matrix([3 2]) # global maxima
+food = np.matrix([3, 2]) # global maxima
 agents = 30 
 delta_t = 0.5 
 num_of_iterations = 100
@@ -35,7 +35,7 @@ def nf(x,y):
 	return math.sqrt(x**2 + y**2)
 
 def obstacles(x,y): # local maxima
-	return min(0, -4*cos(pi*x/3)*cos(pi*y/3) + 0.5)
+	return min(0, -4*math.cos(pi*x/3)*math.cos(pi*y/3) + 0.5)
 
 def foodSource(x,y): # gradient function
 	return min(2.5, -2*log(nf(x-3, y-2)**2))
@@ -45,11 +45,12 @@ def terrain(x,y):
 
 #-- The swarm matrix(somewhere on the terrain)
 theta = np.random.random()*pi*2
-x_min = floor(initial_d*cos(theta)) + food[0] - 0.5
-y_min = floor(initial_d*sin(theta)) + food[1] - 0.5
-X_new = 3*np.random.random_sample(agents, 1) + x_min
-Y_new = 3*np.random.random_sample(agents, 1) + y_min
-X = np.concatenate(X_new, Y_new, axis = 1)# (agents X 2) matrix 
+x_min = floor(initial_d*math.cos(theta)) + food[0,0] - 0.5
+y_min = floor(initial_d*math.sin(theta)) + food[0,1] - 0.5
+X_new = 3*np.random.random_sample([agents, 1]) + x_min
+Y_new = 3*np.random.random_sample([agents, 1]) + y_min
+X = np.concatenate((X_new, Y_new), axis = 1)# (agents X 2) matrix 
+print X
 
 #-- update function for agent positions
 def update:
