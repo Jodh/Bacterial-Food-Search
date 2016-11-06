@@ -21,6 +21,7 @@
 
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 # global parameters
 pi = np.pi
@@ -47,10 +48,16 @@ def terrain(x,y):
 theta = np.random.random()*pi*2
 x_min = floor(initial_d*math.cos(theta)) + food[0,0] - 0.5
 y_min = floor(initial_d*math.sin(theta)) + food[0,1] - 0.5
-X_new = 3*np.random.random_sample([agents, 1]) + x_min
-Y_new = 3*np.random.random_sample([agents, 1]) + y_min
+X_new = 3*np.random.random_sample([agents+1, 1]) + x_min
+Y_new = 3*np.random.random_sample([agents+1, 1]) + y_min
 X = np.concatenate((X_new, Y_new), axis = 1)# (agents X 2) matrix 
 print X
+
+# plot X matrix with respect to food position -- temporary solution
+X_new[30,0] = 3
+Y_new[30,0] = 2
+plt.scatter(X_new, Y_new)
+plt.show()
 
 #-- update function for agent positions
 def update:
