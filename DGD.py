@@ -18,18 +18,38 @@
 #of velocity vector can take and 3 comes from log8, where 8 is the number of cardinal directions. 
 #DGD can be considered to be a more generalised form of Sklarsh model where the attraction and orientation radius are 
 #not quantised but diffussed over the whole terrain.
-
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from scipy.spatial import distance
 
 # global parameters
 pi = np.pi
 food = np.matrix([3, 2]) # global maxima
-agents = 30 
-delta_t = 0.5 
-num_of_iterations = 100
+agents = 30
+alpha = .001
+kk = 31
+
+def delta_t(d):
+    return np.exp(alpha*(np.square(d)-np.square(kk)))
+ 
+num_of_iterations = 500
 initial_d = 20
+found_radius = 0.9
+sigma = 0.1
+RR = 0.1 # repulsion radius
+RO = 4   # oreintaion radius
+RA = 4.3 # attraction radius
+L = 4    # descrete levels
+T = 1    # threshold for descretization function
+collision_delay = 10
+#-- attraction and orientation functions, can be changed to zero for no communication
+def orientFunc(x):
+    x = x*1
+    return x
+def attractFunc(x):
+    x = x*1
+    return x
 
 #-- Objective function (terrain)
 def nf(x,y):
@@ -39,44 +59,122 @@ def obstacles(x,y): # local maxima
 	return min(0, -4*math.cos(pi*x/3)*math.cos(pi*y/3) + 0.5)
 
 def foodSource(x,y): # gradient function
-	return min(2.5, -2*log(nf(x-3, y-2)**2))
+	return min(2.5, -2*math.log(nf(x-3, y-2)**2))
 
 def terrain(x,y):
 	return foodSource(x,y) + obstacles(x,y)
 
 #-- The swarm matrix(somewhere on the terrain)
 theta = np.random.random()*pi*2
-x_min = floor(initial_d*math.cos(theta)) + food[0,0] - 0.5
-y_min = floor(initial_d*math.sin(theta)) + food[0,1] - 0.5
-X_new = 3*np.random.random_sample([agents+1, 1]) + x_min
-Y_new = 3*np.random.random_sample([agents+1, 1]) + y_min
+x_min = math.floor(initial_d*math.cos(theta)) + food[0,0] - 0.5
+y_min = math.floor(initial_d*math.sin(theta)) + food[0,1] - 0.5
+X_new = 3*np.random.random_sample([agents, 1]) + x_min
+Y_new = 3*np.random.random_sample([agents, 1]) + y_min
 X = np.concatenate((X_new, Y_new), axis = 1)# (agents X 2) matrix 
-print X
 
-# plot X matrix with respect to food position -- temporary solution
-X_new[30,0] = 3
-Y_new[30,0] = 2
-plt.scatter(X_new, Y_new)
+
+Y = np.concatenate((X,food))
+plt.scatter(Y[:,0], Y[:,1])
 plt.show()
 
-#-- update function for agent positions
-def update:
-	V = zero[size(X)] #initialize velocity matrix 
-	KO = zero[agent_number,1] #initialize collision_delay_matrix 
-	for i in range(interation):
-		if half of the agents reach [c1, c2]: break
-		#-- update V matrix
-		D = pair_wise_distance_matrix #Distance matrix D for every pair of agents. n X n matrix
-		
-		for i in range(1,(agents +1)):
-			# calculate gradient change for i-th agent, delta_g 
-			X_prev(i) = X(i) - dt*V(i) 	
-			delta_g = terrain(X(i)) - terrain(X_prev(i))
-			# tumble if delta_g <= 0
-			if delta_g <= 0: pick random travel direction
-			else keep going in same direction
-			#-- calculate orentaion and attraction components for i-th agent over all agents
-			# |-equation (7) from paper	
-			#-- do not calculate V for agents where collision is detected by checking Repulsion Radius and D(i) matrix 
-		#-- Update X matrix 
-		X = X + delta_t*V 	
+
+# initialize velocity matrix
+V = np.zeros((agents, 2))
+
+#initialize Collision delay matrix
+KO = np.zeros((agents,1))
+
+
+# weigth function
+def wf(u,v,delta_gradient):
+    return u + 10*(delta_gradient > 0)*v
+
+# descritization function
+def df(x):
+    return x
+
+# distance function to calculate number of agents that have found food source
+def distFunc(X, food, found_radius):
+    distanceMatrix = np.sqrt(np.sum(np.square(np.subtract(X,food)),axis = 1))
+    for i in range(np.size(distanceMatrix)):
+	if distanceMatrix[i,0] < found_radius:
+	    distanceMatrix[i,0] = 1
+	else:
+	    distanceMatrix[i,0] = 0
+    if np.sum(distanceMatrix) >= (agents/2):
+	return True
+    else:
+	return False
+
+#-- interaction function to account for effect of other agents on i-th agent
+def interaction(i, X, V, D_i):
+    repulsion_index = np.where((D_i <= RR) & (D_i > 0))
+    if collision_delay == 0 and np.any(repulsion_index):
+	u = -1*np.sum(X[repulsion_index,:] - X[i,:], axis = 0)
+    else:
+	DistanceArray = np.sqrt(np.sum(np.square(np.subtract(X,food)),axis = 1))
+	w_o = np.tile(np.reshape(orientFunc(DistanceArray),(agents,1)),2)
+	w_a = np.tile(np.reshape(attractFunc(DistanceArray),(agents,1)),2)
+	w_o[i] = 0 # no interaction with itself
+	w_a[i] = 0 # no interaction with itself
+
+	attracts = X - X[i,:]
+	
+	orient = np.zeros((1,2))
+	attract = np.zeros((1,2))
+	for j in range(agents):
+	    orient += df(np.multiply(V[j,:], w_o[j]))
+	    attract += df(np.multiply(attracts[j,:], w_a[j]))
+
+	u = orient + attract
+	if np.linalg.norm(u) > 0:
+	    u = u/np.linalg.norm(u)
+    return u  
+	
+    
+
+#-- velocity function for updation V_new
+def velocity(i, X, V, D_i):
+    DistanceArray = np.sqrt(np.sum(np.square(np.subtract(X[i,:],food)),axis = 1))
+    prevX = X[i,:] - delta_t(DistanceArray)*V[i,:]
+    delta_gradient = terrain(X[i,0],X[i,1]) - terrain(prevX[0,0],prevX[0,1])
+    theta = pi*np.random.random()*(delta_gradient <=0)
+    R = np.matrix([[np.cos(theta), -1*np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    v = wf(interaction(i, X, V, D_i), V[i,:]*R, delta_gradient)
+# normalize the value of v
+    if np.linalg.norm(v) > 0:
+	v = v/np.linalg.norm(v)
+# add collion delay for agents with pairwise distances < RR
+    if (KO[i,0] > 0):
+        v = 0
+	KO[i,0] -= 1
+    for j in range(np.size(D_i)):
+	if D_i[j] > 0 and D_i[j] < RR:
+	    KO[i,0] = collision_delay
+	    break
+# add noise	    
+#    v = v + np.random.random_sample([1,2])*sigma
+    return v
+
+#-- velocities function for updating V
+def velocities(V,X):
+    V_new = np.zeros((agents,2))
+# for pair wise distance between agents to calculate interations later on
+    D = distance.cdist(X, X, 'euclidean')
+# calculate velocity for each agent in matrix X
+    for i in range(agents):
+	V_new[i,:] = velocity(i, X, V, D[:,i])
+    return V_new
+
+
+for i in range(num_of_iterations):
+    V = velocities(V,X)
+    DistanceArray = np.sqrt(np.sum(np.square(np.subtract(X,food)),axis = 1))
+    X = X + np.multiply(delta_t(DistanceArray),V)
+    if distFunc(X, food, found_radius):
+	print X, i, "agents have reached food source"
+	break
+print X
+X = np.concatenate((X,food))
+plt.scatter(X[:,0], X[:,1])
+plt.show()
