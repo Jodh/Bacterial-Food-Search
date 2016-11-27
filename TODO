@@ -6,11 +6,11 @@ TODO
 1.4 Helper formulas and functions to be used later
 1.5 Parameters
 
-2. Write update function without communication part
+2. Write update function without communication part ----- Done
 
-3. Modify update function with global communication
+3. Modify update function with global communication ---- Done
 
-4. Find and learn a graphics library for python
-4.1 Implement graphics for visualizing the bactera movement
-
-5. Bonus: Implement in parallel environment
+4. Find and learn a graphics library for python     ----- Done
+4.1 Implement graphics for visualizing the bactera movement ----- Done 
+4.2 Turn individual plots into movie
+5. Bonus: Implement in parallel environment  ---- Hahaha, not happening
