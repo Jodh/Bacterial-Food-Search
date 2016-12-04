@@ -28,15 +28,15 @@ pi = np.pi
 food = np.matrix([3, 2]) # global maxima
 agents = 30
 alpha = .001
-kk = 31
+kk = 35
 
 def delta_t(d):
     return np.exp(alpha*(np.square(d)-np.square(kk)))    # variable step size
 #delta_t = 0.5                                             # constant step size
-num_of_iterations = 300
+num_of_iterations = 400
 initial_d = 20
 found_radius = 2.5
-sigma = 0.1
+sigma = 0.01
 K = 200
 variance = 1000
 RR = 0.1 # repulsion radius
@@ -78,8 +78,9 @@ X = np.concatenate((X_new, Y_new), axis = 1)# (agents X 2) matrix
 Y = np.concatenate((X,food))
 plt.scatter(Y[:,0], Y[:,1])
 plt.scatter(food[0,0], food[0,1], s = pi*(5**2), color = 'g')
-plt.axis([-22,22,-22,22])
-plt.show()
+plt.axis([-25,25,-25,25])
+plt.savefig("before.png")
+plt.close()
 
 
 # initialize velocity matrix
@@ -88,14 +89,68 @@ V = np.zeros((agents, 2))
 #initialize Collision delay matrix
 KO = np.zeros((agents,1))
 
+# initialize Timeline matrix
+converged_agents_timeline = np.zeros(num_of_iterations/10)
 
 # weigth function
-def wf(u,v):
-    return u + 20*v
+def wf(u,v, delta_gradient):
+    return u + 30*v
 
-# descritization function
-def df(x):
-    return x
+# check quadrant for u vector and modify value of theta accordingly
+def check_quadrant_matrix(V_i, theta):
+    x = V_i[0,0]
+    y = V_i[0,1]
+    if x > 0 and y < 0:
+	return theta + pi
+    elif x < 0 and y < 0:
+	return theta + pi
+    return theta
+
+# descritization function, this implementation is based on the theory in the paper, i could not find any mathematical formula for exact numbers. 
+def df(x, T=T):
+    # calculate magnitude of u
+    abs_x = np.sqrt(x[0,0]**2 + x[0,1]**2)
+    # calculate direction of u
+    if abs_x > 0:
+	unit_x = x/abs_x
+    else:
+	unit_x = x   
+
+    # for quantizing direction of u
+    direction = [0, pi/4, pi/2, 3*pi/4, pi, 5*pi/4, 3*pi/2, 7*pi/4] 
+    limits = [pi/8, 3*pi/8, 5*pi/8, 7*pi/8, pi+(pi/8), pi+(3*pi/8), pi+(5*pi/8), pi+(7*pi/8)]
+
+    if abs_x == 0:
+	hypotenous = 1
+    else:
+	hypotenous = abs_x
+    theta = np.arccos(x[0,0]/hypotenous)
+    theta = check_quadrant_matrix(x, theta)
+
+    if limits[7] < theta <= limits[0]:
+	theta = direction[0]
+    for i in range(7):
+        if limits[i] < theta <= limits[i+1]:
+	    theta = direction[i+1]
+	    break
+    unit_x = np.matrix(([np.cos(theta), np.sin(theta)]))
+
+    # for quantizing direction of u
+    level = [0.25, 0.50, 0.75, T]
+
+    if abs_x >=T: 
+        abs_x = level[3]
+    elif level[2] <= abs_x < level[3]:
+	abs_x = level[2]
+    elif level[1] <= abs_x < level[2]:
+	abs_x = level[1]
+    elif level[0] <= abs_x < level[1]:
+	abs_x = level[0]
+    else:
+	abs_x = 0
+    
+    return abs_x*unit_x 
+    
 
 # check quadrant for velocity vector and modify value of theta accordingly
 def check_quadrant(V_i, theta):
@@ -108,17 +163,20 @@ def check_quadrant(V_i, theta):
     return theta
 
 # distance function to calculate number of agents that have found food source
-def distFunc(X, food, found_radius):
+def distFunc(X, food, found_radius, i):
     distanceMatrix = np.sqrt(np.sum(np.square(np.subtract(X,food)),axis = 1))
-    for i in range(np.size(distanceMatrix)):
-	if distanceMatrix[i,0] < found_radius:
-	    distanceMatrix[i,0] = 1
+    flag_stop = False  
+    for j in range(np.size(distanceMatrix)):
+	if distanceMatrix[j,0] < found_radius:
+	    distanceMatrix[j,0] = 1
 	else:
-	    distanceMatrix[i,0] = 0
-    if np.sum(distanceMatrix) >= (3*agents/4):
-	return True
-    else:
-	return False
+	    distanceMatrix[j,0] = 0
+    converged_agents = np.sum(distanceMatrix)
+    if i%10 == 0:
+        converged_agents_timeline[i/10] = converged_agents 
+    if converged_agents >= (3*agents/4):
+        flag_stop = True
+    return converged_agents_timeline, flag_stop
 
 #-- interaction function to account for effect of other agents on i-th agent
 def interaction(i, X, V, D_i):
@@ -146,12 +204,16 @@ def interaction(i, X, V, D_i):
 	orient = np.zeros((1,2))
 	attract = np.zeros((1,2))
 	for j in range(agents):
-	    orient += df(np.multiply(V[j,:], w_o[j]))
-	    attract += df(np.multiply(attracts[j,:], w_a[j]))
+	    orient += np.multiply(V[j,:], w_o[j])
+	    abs_attracts = np.sqrt(attracts[j,0]**2 + attracts[j,1]**2)
+	    if abs_attracts == 0:
+	        attracts[j,:] = 0 
+	        attract += np.multiply(attracts[j,:], w_a[j])
+	    else:
+		attract += np.multiply(attracts[j,:]/abs_attracts, w_a[j])	        
 
-	u = orient + attract
-	if np.linalg.norm(u) > 0:
-	    u = u/np.linalg.norm(u)
+	u = df(orient + attract)
+
     return u  
 	
     
@@ -172,7 +234,7 @@ def velocity(i, X, V, D_i):
     else:
 	theta_new = mu
     V[i,:] = [np.cos(theta_new), np.sin(theta_new)] 
-    v = wf(interaction(i, X, V, D_i), V[i,:])
+    v = wf(interaction(i, X, V, D_i), V[i,:], delta_gradient)
 # normalize the value of v
     if np.linalg.norm(v) > 0:
 	v = v/np.linalg.norm(v)
@@ -185,7 +247,7 @@ def velocity(i, X, V, D_i):
 	    KO[i,0] = collision_delay
 	    break
 # add noise	    
-#    v = v + np.random.random_sample([1,2])*sigma
+    v = v + np.random.random_sample([1,2])*sigma
     return v
 
 #-- velocities function for updating V
@@ -198,18 +260,31 @@ def velocities(V,X):
 	V_new[i,:] = velocity(i, X, V, D[:,i])
     return V_new
 
-
+#-- start simulation
 for i in range(num_of_iterations):
     V = velocities(V,X)
     DistanceArray = np.sqrt(np.sum(np.square(np.subtract(X,food)),axis = 1)) # comment out if using constant time step
     X = X + np.multiply(delta_t(DistanceArray),V)                           # comment out if using constant time step
 #    X = X + delta_t*V                                                       # use for constant step size
-    if distFunc(X, food, found_radius):
-	print X, "agents have reached food source after %d iterations" % i
+    converged_agents_timeline, flag_stop = distFunc(X, food, found_radius,i)
+    if flag_stop:
+	print "Agents have reached food source after %d iterations" % i
 	break
-print X
+
+    	
+print converged_agents_timeline
+
 #-- plot the agents and food
-plt.scatter(X[:,0], X[:,1])
 plt.scatter(food[0,0], food[0,1], s = pi*(5**2), color = 'g')
+plt.scatter(X[:,0], X[:,1])	
 plt.axis([-25,25,-25,25])
-plt.show()
+plt.savefig("after.png")
+plt.close()
+#-- plot slope of model
+iteration_axis = np.linspace(0,400,40)
+plt.plot(iteration_axis, converged_agents_timeline)
+plt.xlabel("iterations")
+plt.ylabel("No of agents converged")
+plt.axis([0 ,400,0 ,30])
+plt.savefig("timeline.png")
+plt.close()
