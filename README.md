@@ -5,14 +5,14 @@ The original code can be found here: https://github.com/sss1/bact-sim , but it i
 
 If you are looking to implement it yourself please use the original research paper by the same people, which can be found here: http://www.snl.salk.edu/~navlakha/pubs/recomb2016.pdf
 
-# Running and understading the output
+# Running and understanding the output
 1. Download DGD.py
 2. Install numpy, matplotlib and scipy libraries
- 2.1 For Ubuntu use command ```sudo apt-get install python-*name_of_library*```
- 2.2 Replace *name_of_library* by numpy, matplotlib and scipy respectively to install them
+  1. For Ubuntu use command ```sudo apt-get install python-name_of_library```
+  2. Replace *name_of_library* by numpy, matplotlib and scipy respectively to install them
 3. Open terminal, change directory to where ever DGD.py is stored
 4. Enter this in the terminal ```python DGD.py``` 
 5. Three .png image files will be generated
- 5.1 before.png : The state of the swarm in the beginning
- 5.2 after.png  : State of the swarm after the simulation has run
- 5.3 timeline.png : Gives the number of bacteria that have reached the food source per iteration
+  1. before.png : The state of the swarm in the beginning
+  2. after.png  : State of the swarm after the simulation has run
+  3. timeline.png : Gives the number of bacteria that have reached the food source per iteration
